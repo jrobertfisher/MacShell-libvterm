@@ -218,26 +218,39 @@ size_t vterm_input_write(VTerm *vt, const char *bytes, size_t len)
 
       /* fallthrough */
     case CSI_ARGS:
+      /* args[] holds CSI_ARGS_MAX entries. argi stops at CSI_ARGS_MAX
+         ("full"): the first CSI_ARGS_MAX arguments are kept, later ones
+         are ignored, and the sequence is still delivered with the
+         arguments collected so far. */
       /* Numerical value of argument */
       if(c >= '0' && c <= '9') {
-        if(vt->parser.v.csi.args[vt->parser.v.csi.argi] == CSI_ARG_MISSING)
-          vt->parser.v.csi.args[vt->parser.v.csi.argi] = 0;
-        vt->parser.v.csi.args[vt->parser.v.csi.argi] *= 10;
-        vt->parser.v.csi.args[vt->parser.v.csi.argi] += c - '0';
+        if(vt->parser.v.csi.argi < CSI_ARGS_MAX) {
+          if(vt->parser.v.csi.args[vt->parser.v.csi.argi] == CSI_ARG_MISSING)
+            vt->parser.v.csi.args[vt->parser.v.csi.argi] = 0;
+          vt->parser.v.csi.args[vt->parser.v.csi.argi] *= 10;
+          vt->parser.v.csi.args[vt->parser.v.csi.argi] += c - '0';
+        }
         break;
       }
       if(c == ':') {
-        vt->parser.v.csi.args[vt->parser.v.csi.argi] |= CSI_ARG_FLAG_MORE;
+        if(vt->parser.v.csi.argi < CSI_ARGS_MAX)
+          vt->parser.v.csi.args[vt->parser.v.csi.argi] |= CSI_ARG_FLAG_MORE;
         c = ';';
       }
       if(c == ';') {
-        vt->parser.v.csi.argi++;
-        vt->parser.v.csi.args[vt->parser.v.csi.argi] = CSI_ARG_MISSING;
+        if(vt->parser.v.csi.argi < CSI_ARGS_MAX) {
+          vt->parser.v.csi.argi++;
+          if(vt->parser.v.csi.argi < CSI_ARGS_MAX)
+            vt->parser.v.csi.args[vt->parser.v.csi.argi] = CSI_ARG_MISSING;
+        }
         break;
       }
 
       /* else fallthrough */
-      vt->parser.v.csi.argi++;
+      /* argi becomes the argument count here (at most CSI_ARGS_MAX);
+         do_csi() reads args[0 .. argi-1] */
+      if(vt->parser.v.csi.argi < CSI_ARGS_MAX)
+        vt->parser.v.csi.argi++;
       vt->parser.intermedlen = 0;
       vt->parser.state = CSI_INTERMED;
     case CSI_INTERMED:

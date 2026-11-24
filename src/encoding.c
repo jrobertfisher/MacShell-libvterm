@@ -46,10 +46,15 @@ static void decode_utf8(VTermEncoding *enc, void *data_,
       return;
 
     else if(c >= 0x20 && c < 0x7f) {
+      /* This branch can write two codepoints (the invalid marker for an
+         unfinished sequence, then the character), while the loop guard
+         allows for one; if the marker takes the last slot, the character
+         is left out and the loop ends on its guard. */
       if(data->bytes_remaining)
         cp[(*cpi)++] = UNICODE_INVALID;
 
-      cp[(*cpi)++] = c;
+      if(*cpi < cplen)
+        cp[(*cpi)++] = c;
 #ifdef DEBUG_PRINT_UTF8
       printf(" UTF-8 char: U+%04x\n", c);
 #endif
